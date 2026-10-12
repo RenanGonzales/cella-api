@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.core.demo import DEMO_INVITE_CODE, DEMO_PASSWORD, DEMO_USERS
 from app.core.security import hash_password
+from app.domain.defaults import DEFAULT_CATEGORIES, DEFAULT_STORAGE_AREAS
 from app.domain.stock import quantity_needed
 from app.models import (
     Category,
@@ -36,23 +37,8 @@ from app.models import (
 
 USERS = DEMO_USERS
 
-STORAGE_AREAS = ["Fridge", "Freezer", "Pantry", "Bathroom", "Laundry"]
-
-CATEGORIES = [
-    "Produce",
-    "Bakery",
-    "Dairy",
-    "Meat",
-    "Frozen",
-    "Grains & Pasta",
-    "Canned & Sauces",
-    "Breakfast",
-    "Snacks",
-    "Beverages",
-    "Cleaning",
-    "Personal Care",
-    "Paper Goods",
-]
+STORAGE_AREAS = DEFAULT_STORAGE_AREAS
+CATEGORIES = DEFAULT_CATEGORIES
 
 # Corridors in walking order and the categories found in each one.
 # "Paper Goods" is intentionally left unmapped to show the "Other" group.

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, CreatedAt, Quantity, UUIDPrimaryKey, enum_check, str_enum
@@ -22,6 +22,15 @@ class StorageArea(UUIDPrimaryKey, Base):
     position: Mapped[int] = mapped_column(Integer, default=0)
 
 
+# Names are unique per household, ignoring case ("Pantry" and "pantry" are the same area).
+Index(
+    "uq_storage_areas_household_id_lower_name",
+    StorageArea.household_id,
+    func.lower(StorageArea.name),
+    unique=True,
+)
+
+
 class Category(UUIDPrimaryKey, Base):
     """Product category; each market maps categories to its corridors."""
 
@@ -31,6 +40,14 @@ class Category(UUIDPrimaryKey, Base):
         ForeignKey("households.id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(50))
+
+
+Index(
+    "uq_categories_household_id_lower_name",
+    Category.household_id,
+    func.lower(Category.name),
+    unique=True,
+)
 
 
 class Product(UUIDPrimaryKey, CreatedAt, Base):

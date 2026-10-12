@@ -19,9 +19,11 @@ users
 
 storage_areas                      -- fridge, pantry, bathroom, laundry...
   id, household_id -> households, name, position
+  unique (household_id, lower(name))
 
 categories                         -- dairy, cleaning... (maps to a corridor)
   id, household_id -> households, name
+  unique (household_id, lower(name))
 
 products
   id, household_id -> households,
@@ -33,8 +35,9 @@ products
 consumption_events                 -- history for stock autonomy forecasts
   id, product_id -> products, user_id -> users (nullable), quantity, consumed_at
 
-markets
-  id, household_id -> households, name
+markets                            -- a store as one household knows it
+  id, household_id -> households, name, chain (nullable), address (nullable),
+  archived_at (nullable), created_at
 
 corridors
   id, market_id -> markets, name, position
@@ -66,3 +69,16 @@ A product's "last price" is not stored: it is the `unit_price_cents` from its mo
 5. **Checkout:** `checked` items add `quantity_bought` to stock. The list becomes `archived`. `not_found` and `pending` items are carried over to a new `open` list.
 6. **Fine-tuning at home:** brand and `unit_price_cents` are edited on the archived list.
 7. **Archive product:** sets `archived_at`. The product disappears from the UI and its history is kept.
+8. **New household:** starts with default storage areas and categories (`app/domain/defaults.py`), named in English and translated by the frontend.
+9. **Delete storage area or category:** only when no product (archived included) uses it; otherwise `409`.
+10. **Market layout:** saved as a whole (`PUT /markets/{id}/layout`) in one transaction. Corridors sent with an id keep it; corridors left out are deleted; a category is in at most one corridor per market.
+11. **Delete market:** only if it was never used for shopping; otherwise archive it to keep its prices.
+
+## Shared markets (planned)
+
+Today a market belongs to one household, because its layout maps that household's own categories. The model is prepared for sharing layouts between households that shop at the same store:
+
+1. **Store identity.** `chain` and `address` already identify the physical store. A global `stores` table, keyed by a place id (Google Places or OpenStreetMap), will deduplicate stores typed in different ways; `markets.store_id` will point to it.
+2. **Common category language.** Every household starts with the same default categories (`app/domain/defaults.py`). Importing a layout from another household of the same store copies corridors and maps categories **by name**, so no global category table is needed.
+3. **Crowd corrections.** With several households per store, the most common corridor order and mapping can be suggested to new users, removing the setup step entirely.
+

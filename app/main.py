@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api.routes import auth, me
+from app.api.routes import auth, categories, markets, me, products, storage_areas
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -21,6 +21,10 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(me.router)
+app.include_router(storage_areas.router)
+app.include_router(categories.router)
+app.include_router(products.router)
+app.include_router(markets.router)
 
 
 @app.get("/health", tags=["health"])

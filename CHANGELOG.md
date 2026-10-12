@@ -7,6 +7,39 @@ While the MVP is in progress, versions stay at `0.x`: each delivered block bumps
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-12
+
+### Added
+
+- Markets: list, create, partial update, archive, restore and delete (only when never used for shopping).
+- `chain` and `address` on markets to identify the physical store, preparing layouts to be shared between households (migration `c623b4059b21`).
+- Market layout: `GET /markets/{id}/layout` returns corridors in walking order with their categories, plus unmapped categories; `PUT /markets/{id}/layout` saves the whole layout in one transaction.
+- Layout rules: a category in at most one corridor per market, unique corridor names, kept corridors keep their ids, categories must belong to the household.
+- `docs/data-model.md`: planned path for shared markets.
+- 13 new tests (57 in total).
+
+### Changed
+
+- A request that fails rolls back its database session explicitly.
+
+## [0.3.0] - 2026-10-12
+
+### Added
+
+- Storage areas: list, create, rename, delete and `PUT /storage-areas/order` to reorder the home grid.
+- Categories: list, create, rename and delete.
+- Products: list with filters (storage area, category, below ideal stock, search by name or brand, archived), read, create, partial update, archive and restore.
+- Each product returns its last price paid and purchase date, computed from archived shopping lists.
+- New households start with 5 default storage areas and 13 default categories (English names, translated by the frontend).
+- Storage area and category names are unique per household, ignoring case (migration `e2f8861952e1`).
+- Storage areas and categories in use cannot be deleted (`409`).
+- Household isolation: rows of another household answer `404`, including ids sent as references (category, storage area).
+- 17 new tests (44 in total), including isolation between households.
+
+### Changed
+
+- The demo seed reuses the default storage areas and categories.
+
 ## [0.2.0] - 2026-10-12
 
 ### Added
@@ -41,6 +74,8 @@ While the MVP is in progress, versions stay at `0.x`: each delivered block bumps
 - CI on GitHub Actions: lint, migrations, seed and tests on every push.
 - Documentation: README and data model.
 
-[Unreleased]: https://github.com/RenanGonzales/cella-api/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/RenanGonzales/cella-api/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/RenanGonzales/cella-api/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/RenanGonzales/cella-api/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/RenanGonzales/cella-api/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/RenanGonzales/cella-api/releases/tag/v0.1.0

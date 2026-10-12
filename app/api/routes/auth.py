@@ -9,6 +9,7 @@ from app.core.security import create_access_token, hash_password, verify_passwor
 from app.domain.invite import generate_invite_code, normalize_invite_code
 from app.models import Household, User
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from app.services.catalog import add_default_catalog
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -23,13 +24,14 @@ def _token_response(user: User, settings: Settings) -> TokenResponse:
 
 
 def _create_household(db: DbSession, name: str) -> Household:
-    """Create a household with a unique invite code (retrying on the rare collision)."""
+    """Create a household with a unique invite code and the default storage areas and categories."""
     for _ in range(INVITE_CODE_ATTEMPTS):
         code = generate_invite_code()
         if db.scalar(select(Household.id).where(Household.invite_code == code)) is None:
             household = Household(name=name, invite_code=code)
             db.add(household)
             db.flush()
+            add_default_catalog(db, household.id)
             return household
     raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Could not create household")
 

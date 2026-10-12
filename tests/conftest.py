@@ -39,3 +39,30 @@ def client(db: Session, settings: Settings) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+def signup(client: TestClient, email: str, household_name: str = "Home") -> dict[str, str]:
+    """Register a user with a new household and return the Authorization header."""
+    response = client.post(
+        "/auth/register",
+        json={
+            "name": email.split("@")[0].title(),
+            "email": email,
+            "password": "correct horse battery",
+            "household_name": household_name,
+        },
+    )
+    assert response.status_code == 201, response.text
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+@pytest.fixture
+def owner(client: TestClient) -> dict[str, str]:
+    """Headers of a user with a brand-new household (default areas and categories)."""
+    return signup(client, "owner@example.com")
+
+
+@pytest.fixture
+def stranger(client: TestClient) -> dict[str, str]:
+    """Headers of a user from another household."""
+    return signup(client, "stranger@example.com", household_name="Other home")

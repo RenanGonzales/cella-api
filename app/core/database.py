@@ -14,5 +14,9 @@ def get_db() -> Iterator[Session]:
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        # A failed request never leaves half-applied changes behind.
+        db.rollback()
+        raise
     finally:
         db.close()

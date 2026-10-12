@@ -1,18 +1,30 @@
 import uuid
+from datetime import datetime
 
-from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, UUIDPrimaryKey
+from app.models.base import Base, CreatedAt, UUIDPrimaryKey
 
 
-class Market(UUIDPrimaryKey, Base):
+class Market(UUIDPrimaryKey, CreatedAt, Base):
+    """A store as one household knows it: its name plus the household's corridor layout.
+
+    The layout is personal because it maps the household's own categories. `chain` and
+    `address` identify the physical store, so layouts can later be shared between
+    households of the same store (see docs/data-model.md, "Shared markets").
+    """
+
     __tablename__ = "markets"
 
     household_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("households.id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(100))
+    chain: Mapped[str | None] = mapped_column(String(100))
+    address: Mapped[str | None] = mapped_column(String(255))
+    # Archived markets keep their purchase history but leave the market picker.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     corridors: Mapped[list["Corridor"]] = relationship(
         back_populates="market", order_by="Corridor.position"
