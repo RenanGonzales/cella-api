@@ -7,6 +7,26 @@ While the MVP is in progress, versions stay at `0.x`: each delivered block bumps
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-12
+
+### Added
+
+- Authentication with email and password: `POST /auth/register`, `POST /auth/login`.
+- Sign-up creates a new household or joins an existing one with its invite code, in a single step.
+- `POST /auth/demo`: log in as the demo household without a password (only when `DEMO_ENABLED=true`).
+- `GET /me`: logged-in user, household, invite code and members.
+- `get_current_user` dependency: every protected route is scoped to the user's household.
+- JWT access tokens (HS256, 7 days); bcrypt password hashing with the 72-byte limit validated explicitly.
+- Login errors and response times that do not reveal which emails are registered.
+- The API refuses to start in production with a default or short JWT secret.
+- CORS for the local Vite dev server.
+- Test suite against PostgreSQL with per-test rollback (27 tests).
+- `docs/security.md`: implemented protections, known trade-offs and production roadmap.
+
+### Changed
+
+- Demo household identifiers moved to `app/core/demo.py`, shared by the seed and the demo login.
+
 ## [0.1.0] - 2026-10-12
 
 ### Added
@@ -21,5 +41,6 @@ While the MVP is in progress, versions stay at `0.x`: each delivered block bumps
 - CI on GitHub Actions: lint, migrations, seed and tests on every push.
 - Documentation: README and data model.
 
-[Unreleased]: https://github.com/RenanGonzales/cella-api/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/RenanGonzales/cella-api/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/RenanGonzales/cella-api/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/RenanGonzales/cella-api/releases/tag/v0.1.0

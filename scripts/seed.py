@@ -10,11 +10,12 @@ import random
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-import bcrypt
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
+from app.core.demo import DEMO_INVITE_CODE, DEMO_PASSWORD, DEMO_USERS
+from app.core.security import hash_password
 from app.domain.stock import quantity_needed
 from app.models import (
     Category,
@@ -33,10 +34,7 @@ from app.models import (
     User,
 )
 
-DEMO_INVITE_CODE = "DEMO2026"
-DEMO_PASSWORD = "demo1234"
-
-USERS = [("Alex", "alex@demo.cella.app"), ("Sam", "sam@demo.cella.app")]
+USERS = DEMO_USERS
 
 STORAGE_AREAS = ["Fridge", "Freezer", "Pantry", "Bathroom", "Laundry"]
 
@@ -125,7 +123,7 @@ def create_demo(db: Session) -> Household:
     db.add(household)
     db.flush()
 
-    password_hash = bcrypt.hashpw(DEMO_PASSWORD.encode(), bcrypt.gensalt()).decode()
+    password_hash = hash_password(DEMO_PASSWORD)
     users = [
         User(household_id=household.id, name=name, email=email, password_hash=password_hash)
         for name, email in USERS
