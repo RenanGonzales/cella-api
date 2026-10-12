@@ -54,7 +54,7 @@ shopping_list_items
   id, shopping_list_id -> shopping_lists, product_id -> products,
   quantity_needed, quantity_bought (nullable),
   unit_price_cents (nullable), status (pending | checked | not_found),
-  assigned_user_id -> users (nullable)
+  added_manually (bool), assigned_user_id -> users (nullable)
   unique (shopping_list_id, product_id)
 ```
 
@@ -73,6 +73,15 @@ A product's "last price" is not stored: it is the `unit_price_cents` from its mo
 9. **Delete storage area or category:** only when no product (archived included) uses it; otherwise `409`.
 10. **Market layout:** saved as a whole (`PUT /markets/{id}/layout`) in one transaction. Corridors sent with an id keep it; corridors left out are deleted; a category is in at most one corridor per market.
 11. **Delete market:** only if it was never used for shopping; otherwise archive it to keep its prices.
+
+12. **Manual items win:** an item added or edited by hand (`added_manually`) is never lowered or removed by consume or undo.
+13. **Undo:** within 10 minutes and only by the person who consumed. Restores stock, shrinks or removes the automatic pending item, and deletes the event (a mistaken tap is not consumption).
+
+## Concurrency
+
+Consume and undo lock the product row (`SELECT ... FOR UPDATE`) for the length of the transaction. Two people tapping "consume" on the same product at the same instant are serialized: without the lock, both would read the same stock and one consumption would be lost. `tests/test_shopping.py::test_simultaneous_consumes_are_not_lost` runs two real connections in parallel and fails if the lock is removed.
+
+Creating the active list on first use relies on the partial unique index: if two requests try to create it at once, one wins and the other reuses it.
 
 ## Shared markets (planned)
 

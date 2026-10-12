@@ -31,7 +31,8 @@ def _to_out(product: Product, last_price_cents: int | None, last_purchased_at) -
     )
 
 
-def _read(db: DbSession, user: CurrentUser, product_id: uuid.UUID) -> ProductOut:
+def read_product_out(db: DbSession, user: CurrentUser, product_id: uuid.UUID) -> ProductOut:
+    """A household product with its computed fields (below ideal, last price)."""
     row = db.execute(
         products_with_last_price(user.household_id).where(Product.id == product_id)
     ).first()
@@ -83,7 +84,7 @@ def list_products(
 
 @router.get("/{product_id}", response_model=ProductOut)
 def read_product(product_id: uuid.UUID, user: CurrentUser, db: DbSession) -> ProductOut:
-    return _read(db, user, product_id)
+    return read_product_out(db, user, product_id)
 
 
 @router.post("", response_model=ProductOut, status_code=status.HTTP_201_CREATED)
@@ -92,7 +93,7 @@ def create_product(body: ProductCreate, user: CurrentUser, db: DbSession) -> Pro
     product = Product(household_id=user.household_id, **body.model_dump())
     db.add(product)
     db.commit()
-    return _read(db, user, product.id)
+    return read_product_out(db, user, product.id)
 
 
 @router.patch("/{product_id}", response_model=ProductOut)
@@ -107,7 +108,7 @@ def update_product(
     for field, value in changes.items():
         setattr(product, field, value)
     db.commit()
-    return _read(db, user, product.id)
+    return read_product_out(db, user, product.id)
 
 
 @router.post("/{product_id}/archive", response_model=ProductOut)
@@ -117,7 +118,7 @@ def archive_product(product_id: uuid.UUID, user: CurrentUser, db: DbSession) -> 
     if product.archived_at is None:
         product.archived_at = datetime.now(UTC)
         db.commit()
-    return _read(db, user, product.id)
+    return read_product_out(db, user, product.id)
 
 
 @router.post("/{product_id}/restore", response_model=ProductOut)
@@ -125,4 +126,4 @@ def restore_product(product_id: uuid.UUID, user: CurrentUser, db: DbSession) -> 
     product = get_owned(db, Product, product_id, user.household_id, LABEL)
     product.archived_at = None
     db.commit()
-    return _read(db, user, product.id)
+    return read_product_out(db, user, product.id)

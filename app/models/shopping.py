@@ -3,6 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -72,6 +73,11 @@ class ShoppingListItem(UUIDPrimaryKey, Base):
     status: Mapped[ShoppingListItemStatus] = mapped_column(
         str_enum(ShoppingListItemStatus),
         default=ShoppingListItemStatus.PENDING,
+    )
+    # True once a person added the item or changed its quantity: automatic updates
+    # (consume, undo) then never shrink or remove it.
+    added_manually: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
     )
     # Household member responsible for this item when the list is split.
     assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(

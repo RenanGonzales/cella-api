@@ -7,6 +7,19 @@ While the MVP is in progress, versions stay at `0.x`: each delivered block bumps
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-12
+
+### Added
+
+- `POST /products/{id}/consume`: one tap removes one consume step (or a given `quantity`) from stock; stock never goes below zero and the consumption event records only what was really removed.
+- The shopping list fills itself: when stock falls below the ideal, the product is added (or its quantity raised) in whole packages. Lists are created on first use.
+- `POST /consumption-events/{id}/undo`: undo a mistaken tap within 10 minutes, only by who consumed; restores stock, shrinks or removes the automatic list item and deletes the event.
+- `GET /shopping-list`: active list grouped by the chosen market's corridors in walking order (unmapped categories in "Other", last), or by category; each item carries brand and last price.
+- Shopping list items by hand: add, change quantity, remove. Items added or edited by hand are never lowered or removed by automatic updates (`added_manually`, migration `eb459f002aab`).
+- Consuming while someone is at the market adds the item to the list in progress as pending; items already in the cart are left alone.
+- Row lock (`SELECT ... FOR UPDATE`) on consume and undo, so simultaneous taps on the same product are never lost. Covered by a test with two real concurrent connections, which fails without the lock.
+- 22 new tests (79 in total).
+
 ## [0.4.0] - 2026-10-12
 
 ### Added
@@ -74,7 +87,8 @@ While the MVP is in progress, versions stay at `0.x`: each delivered block bumps
 - CI on GitHub Actions: lint, migrations, seed and tests on every push.
 - Documentation: README and data model.
 
-[Unreleased]: https://github.com/RenanGonzales/cella-api/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/RenanGonzales/cella-api/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/RenanGonzales/cella-api/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/RenanGonzales/cella-api/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/RenanGonzales/cella-api/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/RenanGonzales/cella-api/compare/v0.1.0...v0.2.0

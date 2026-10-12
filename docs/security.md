@@ -17,6 +17,8 @@ Format: **threat -> protection -> trade-off**.
 | Weak signing key in production | The API refuses to start in production with the default secret or a secret shorter than 32 bytes (RFC 7518) | `app/core/config.py` |
 | One household reading another's data | Every protected route resolves the user from the token (`get_current_user`) and filters by `household_id`. Ids are random UUIDs, not sequential numbers | `app/api/deps.py` |
 | Insecure direct object references (IDOR) | Every id in a URL or in a request body (category, storage area) is checked against the user's household. Rows of another household answer `404`, never `403`, so their existence is not even confirmed. Covered by tests | `app/services/catalog.py` |
+| Undoing someone else's action | Undo only works for the person who consumed, within 10 minutes; other members get `403`, other households `404` | `app/services/shopping.py` |
+| Lost updates under concurrent requests | Stock changes lock the product row, so simultaneous requests cannot overwrite each other | `app/services/shopping.py` |
 | Guessable invite codes | 8 random characters from a 31-symbol alphabet (about 850 billion combinations), generated with `secrets` | `app/domain/invite.py` |
 | Duplicate accounts | Emails are normalized to lowercase and enforced unique by the database, including concurrent sign-ups | `app/api/routes/auth.py` |
 | Demo login abused outside the demo | `POST /auth/demo` only exists when `DEMO_ENABLED=true` | `app/api/routes/auth.py` |
