@@ -9,6 +9,7 @@ from app.api.routes import (
     markets,
     me,
     products,
+    purchases,
     shopping_list,
     storage_areas,
 )
@@ -36,6 +37,7 @@ app.include_router(products.router)
 app.include_router(markets.router)
 app.include_router(consumption.router)
 app.include_router(shopping_list.router)
+app.include_router(purchases.router)
 
 
 @app.get("/health", tags=["health"])

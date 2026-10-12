@@ -8,7 +8,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.domain.stock import quantity_needed
+from app.domain.stock import needs_restock, quantity_needed
 from app.models import (
     Category,
     ConsumptionEvent,
@@ -32,12 +32,20 @@ OTHER_GROUP = "Other"
 # --- Active list ----------------------------------------------------------
 
 
-def find_active_list(db: Session, household_id: uuid.UUID) -> ShoppingList | None:
-    return db.scalar(
-        select(ShoppingList).where(
-            ShoppingList.household_id == household_id, ShoppingList.status.in_(ACTIVE_STATUSES)
-        )
+def find_active_list(
+    db: Session, household_id: uuid.UUID, lock: bool = False
+) -> ShoppingList | None:
+    """The household's open or in-progress list. With `lock`, the row is locked.
+
+    Lock order everywhere is: active list first, then products (sorted by id). Using one
+    order in every transaction prevents deadlocks between consume and checkout.
+    """
+    query = select(ShoppingList).where(
+        ShoppingList.household_id == household_id, ShoppingList.status.in_(ACTIVE_STATUSES)
     )
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    return db.scalar(query)
 
 
 def get_or_create_active_list(db: Session, household_id: uuid.UUID) -> ShoppingList:
@@ -94,17 +102,22 @@ def _needed(product: Product) -> Decimal:
     return quantity_needed(product.ideal_quantity, product.current_quantity, product.consume_step)
 
 
-def add_if_below_ideal(db: Session, product: Product) -> bool:
-    """After a consume: put the product on the list (or raise its quantity) if needed.
+def _needs_restock(product: Product) -> bool:
+    return needs_restock(product.current_quantity, product.min_quantity, product.ideal_quantity)
+
+
+def add_if_needs_restock(db: Session, product: Product) -> bool:
+    """After a consume: once stock reaches the minimum, put the product on the list
+    (or raise its quantity) to get back to the ideal.
 
     Returns True when the product is on the active list afterwards. Never lowers a
     quantity a person chose, and never touches an item already in the cart.
     """
-    needed = _needed(product)
-    if needed <= 0:
+    if not _needs_restock(product):
         active = find_active_list(db, product.household_id)
         return active is not None and find_item(db, active.id, product.id) is not None
 
+    needed = _needed(product)
     active = get_or_create_active_list(db, product.household_id)
     item = find_item(db, active.id, product.id)
     if item is None:
@@ -121,7 +134,8 @@ def add_if_below_ideal(db: Session, product: Product) -> bool:
 
 
 def shrink_after_undo(db: Session, product: Product) -> None:
-    """After an undo: lower or remove an automatic pending item that is no longer needed."""
+    """After an undo: lower an automatic pending item, or remove it when stock is back
+    above the minimum."""
     active = find_active_list(db, product.household_id)
     if active is None:
         return
@@ -129,11 +143,10 @@ def shrink_after_undo(db: Session, product: Product) -> None:
     if item is None or item.added_manually or item.status != ShoppingListItemStatus.PENDING:
         return
 
-    needed = _needed(product)
-    if needed <= 0:
+    if not _needs_restock(product):
         db.delete(item)
     else:
-        item.quantity_needed = needed
+        item.quantity_needed = _needed(product)
 
 
 # --- Consume and undo -----------------------------------------------------
@@ -146,6 +159,7 @@ def consume_product(
 
     The caller commits. Returns (product, event, consumed, on_list).
     """
+    find_active_list(db, user.household_id, lock=True)  # lock order: list, then product
     product = lock_product(db, product_id, user.household_id)
     if product.archived_at is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Product is archived")
@@ -161,7 +175,7 @@ def consume_product(
         event = ConsumptionEvent(product_id=product.id, user_id=user.id, quantity=consumed)
         db.add(event)
 
-    on_list = add_if_below_ideal(db, product)
+    on_list = add_if_needs_restock(db, product)
     db.flush()
     return product, event, consumed, on_list
 
@@ -181,6 +195,7 @@ def undo_consumption(db: Session, user: User, event_id: uuid.UUID) -> tuple[Prod
     if datetime.now(UTC) - consumed_at > UNDO_WINDOW:
         raise HTTPException(status.HTTP_409_CONFLICT, "Too late to undo")
 
+    find_active_list(db, user.household_id, lock=True)  # lock order: list, then product
     product = lock_product(db, product.id, user.household_id)
     product.current_quantity += event.quantity
     restored = event.quantity
@@ -195,13 +210,20 @@ def undo_consumption(db: Session, user: User, event_id: uuid.UUID) -> tuple[Prod
 
 
 def build_list_view(
-    db: Session, household_id: uuid.UUID, market_id: uuid.UUID | None
+    db: Session,
+    household_id: uuid.UUID,
+    market_id: uuid.UUID | None,
+    only_user_id: uuid.UUID | None = None,
 ) -> ShoppingListOut:
     """Active list grouped by the market's corridors (walking order), or by category.
 
-    Categories without a corridor in that market go to an "Other" group at the end.
+    While shopping, the chosen market is used when no `market_id` is given. Categories
+    without a corridor in that market go to an "Other" group at the end. With
+    `only_user_id`, only the items assigned to that person are returned (their route).
     """
     active = find_active_list(db, household_id)
+    if active is not None and market_id is None:
+        market_id = active.market_id
     if active is None:
         return ShoppingListOut(
             id=None,
@@ -220,6 +242,8 @@ def build_list_view(
         .outerjoin(last, last.c.product_id == Product.id)
         .where(ShoppingListItem.shopping_list_id == active.id)
     )
+    if only_user_id is not None:
+        query = query.where(ShoppingListItem.assigned_user_id == only_user_id)
 
     if market_id is not None:
         query = (

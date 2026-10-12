@@ -78,9 +78,18 @@ class ProductCreate(BaseModel):
     unit: ProductUnit
     consume_step: PositiveQuantity
     ideal_quantity: NonNegativeQuantity
+    min_quantity: NonNegativeQuantity | None = Field(
+        default=None, description="Reorder point; defaults to the ideal quantity"
+    )
     current_quantity: NonNegativeQuantity = Decimal("0")
 
     _strip = field_validator("name", "brand", mode="before")(_strip)
+
+    @model_validator(mode="after")
+    def minimum_not_above_ideal(self) -> "ProductCreate":
+        if self.min_quantity is not None and self.min_quantity > self.ideal_quantity:
+            raise ValueError("min_quantity cannot be greater than ideal_quantity")
+        return self
 
 
 class ProductUpdate(BaseModel):
@@ -91,6 +100,7 @@ class ProductUpdate(BaseModel):
     unit: ProductUnit | None = None
     consume_step: PositiveQuantity | None = None
     ideal_quantity: NonNegativeQuantity | None = None
+    min_quantity: NonNegativeQuantity | None = None
     current_quantity: NonNegativeQuantity | None = None
 
     _strip = field_validator("name", "brand", mode="before")(_strip)
@@ -113,8 +123,10 @@ class ProductOut(BaseModel):
     unit: ProductUnit
     consume_step: JsonDecimal
     ideal_quantity: JsonDecimal
+    min_quantity: JsonDecimal
     current_quantity: JsonDecimal
     below_ideal: bool
+    needs_restock: bool = Field(description="Stock reached the minimum: goes on the shopping list")
     last_price_cents: int | None = Field(description="Price per unit in the last purchase")
     last_purchased_at: datetime | None
     archived_at: datetime | None

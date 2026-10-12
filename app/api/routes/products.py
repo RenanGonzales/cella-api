@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.deps import CurrentUser, DbSession
+from app.domain.stock import needs_restock
 from app.models import Category, Product, StorageArea
 from app.schemas.catalog import ProductCreate, ProductOut, ProductUpdate
 from app.services.catalog import get_owned, products_with_last_price
@@ -23,8 +24,12 @@ def _to_out(product: Product, last_price_cents: int | None, last_purchased_at) -
         unit=product.unit,
         consume_step=product.consume_step,
         ideal_quantity=product.ideal_quantity,
+        min_quantity=product.min_quantity,
         current_quantity=product.current_quantity,
         below_ideal=product.current_quantity < product.ideal_quantity,
+        needs_restock=needs_restock(
+            product.current_quantity, product.min_quantity, product.ideal_quantity
+        ),
         last_price_cents=last_price_cents,
         last_purchased_at=last_purchased_at,
         archived_at=product.archived_at,
@@ -61,6 +66,9 @@ def list_products(
     storage_area_id: uuid.UUID | None = None,
     category_id: uuid.UUID | None = None,
     below_ideal: bool = Query(False, description="Only products under their ideal stock"),
+    needs_restock_only: bool = Query(
+        False, alias="needs_restock", description="Only products that reached their minimum"
+    ),
     q: str | None = Query(None, max_length=100, description="Search by name or brand"),
     include_archived: bool = False,
 ) -> list[ProductOut]:
@@ -74,6 +82,11 @@ def list_products(
         query = query.where(Product.category_id == category_id)
     if below_ideal:
         query = query.where(Product.current_quantity < Product.ideal_quantity)
+    if needs_restock_only:
+        query = query.where(
+            Product.current_quantity <= Product.min_quantity,
+            Product.current_quantity < Product.ideal_quantity,
+        )
     if q:
         pattern = f"%{q.strip()}%"
         query = query.where(Product.name.ilike(pattern) | Product.brand.ilike(pattern))
@@ -90,7 +103,10 @@ def read_product(product_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Pro
 @router.post("", response_model=ProductOut, status_code=status.HTTP_201_CREATED)
 def create_product(body: ProductCreate, user: CurrentUser, db: DbSession) -> ProductOut:
     _check_references(db, user, body.category_id, body.storage_area_id)
-    product = Product(household_id=user.household_id, **body.model_dump())
+    values = body.model_dump()
+    if values["min_quantity"] is None:
+        values["min_quantity"] = values["ideal_quantity"]
+    product = Product(household_id=user.household_id, **values)
     db.add(product)
     db.commit()
     return read_product_out(db, user, product.id)
@@ -104,6 +120,11 @@ def update_product(
     product = get_owned(db, Product, product_id, user.household_id, LABEL)
     changes = body.model_dump(exclude_unset=True)
     _check_references(db, user, changes.get("category_id"), changes.get("storage_area_id"))
+
+    ideal = changes.get("ideal_quantity", product.ideal_quantity)
+    minimum = changes.get("min_quantity", product.min_quantity)
+    if minimum > ideal:
+        raise HTTPException(422, "min_quantity cannot be greater than ideal_quantity")
 
     for field, value in changes.items():
         setattr(product, field, value)

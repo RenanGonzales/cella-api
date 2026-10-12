@@ -29,7 +29,7 @@ products
   id, household_id -> households,
   category_id -> categories, storage_area_id -> storage_areas,
   name, brand (nullable), unit (un | kg | g | l | ml),
-  consume_step, ideal_quantity, current_quantity,
+  consume_step, min_quantity, ideal_quantity, current_quantity,
   archived_at (nullable), created_at
 
 consumption_events                 -- history for stock autonomy forecasts
@@ -62,10 +62,10 @@ A product's "last price" is not stored: it is the `unit_price_cents` from its mo
 
 ## Business rules
 
-1. **Consume:** `current_quantity -= consume_step` (never below zero) and a `consumption_event` is recorded. If `current_quantity < ideal_quantity`, the item is created or updated in the active list with `quantity_needed = ideal_quantity - current_quantity`, rounded up to whole packages (`consume_step` is the package size). Example: 3 kg missing, 5 kg package -> 5 kg. See `app/domain/stock.py`.
+1. **Consume:** `current_quantity -= consume_step` (never below zero) and a `consumption_event` is recorded. When stock reaches the minimum (`current_quantity <= min_quantity` and below the ideal), the item is created or updated in the active list with `quantity_needed = ideal_quantity - current_quantity`, rounded up to whole packages (`consume_step` is the package size). Example: milk with ideal 6 and minimum 2 goes on the list at 2, asking for 4. `min_quantity` defaults to the ideal. See `app/domain/stock.py`.
 2. **One active list per household:** at most one list with status `open` or `shopping`, enforced by a partial unique index. Consuming during shopping adds the item to the list in progress as `pending`.
 3. **Start shopping:** a market is selected, the list becomes `shopping` and is sorted by `corridors.position`. Categories without a corridor in that market go to an "Other" group at the end.
-4. **Split:** `assigned_user_id` is filled by blocks of neighboring corridors, balancing the number of items. It can be changed manually.
+4. **Split:** `assigned_user_id` is filled by blocks of neighboring corridors, minimizing the largest number of items any one person gets (linear partition, `app/domain/split.py`). A corridor is never split; items in the cart keep their person; it can be changed by hand.
 5. **Checkout:** `checked` items add `quantity_bought` to stock. The list becomes `archived`. `not_found` and `pending` items are carried over to a new `open` list.
 6. **Fine-tuning at home:** brand and `unit_price_cents` are edited on the archived list.
 7. **Archive product:** sets `archived_at`. The product disappears from the UI and its history is kept.
@@ -79,7 +79,11 @@ A product's "last price" is not stored: it is the `unit_price_cents` from its mo
 
 ## Concurrency
 
-Consume and undo lock the product row (`SELECT ... FOR UPDATE`) for the length of the transaction. Two people tapping "consume" on the same product at the same instant are serialized: without the lock, both would read the same stock and one consumption would be lost. `tests/test_shopping.py::test_simultaneous_consumes_are_not_lost` runs two real connections in parallel and fails if the lock is removed.
+**Lock order.** Every transaction that changes stock locks the household's active list first and then the products, in id order: consume, undo and checkout. One shared order means two transactions can never wait on each other in a cycle (deadlock).
+
+**Checkout.** The list row is locked, so if two phones tap "finish" together, one checkout archives the list and the other gets `409`; stock is added once. Covered by `tests/test_store.py::test_two_phones_finishing_at_once_add_stock_only_once`, which fails without the lock.
+
+**Consume.** Consume and undo lock the product row (`SELECT ... FOR UPDATE`) for the length of the transaction. Two people tapping "consume" on the same product at the same instant are serialized: without the lock, both would read the same stock and one consumption would be lost. `tests/test_shopping.py::test_simultaneous_consumes_are_not_lost` runs two real connections in parallel and fails if the lock is removed.
 
 Creating the active list on first use relies on the partial unique index: if two requests try to create it at once, one wins and the other reuses it.
 

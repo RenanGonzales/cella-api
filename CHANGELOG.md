@@ -7,6 +7,29 @@ While the MVP is in progress, versions stay at `0.x`: each delivered block bumps
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-12
+
+Completes the backend of the MVP.
+
+### Added
+
+- Minimum stock (reorder point): `min_quantity` on products. A product goes on the shopping list when its stock reaches the minimum, and the list asks for enough to get back to the ideal. Defaults to the ideal quantity; existing products keep their behavior (migration `5a4ed3d47a10` backfills it).
+- `needs_restock` on products and a `needs_restock` filter on `GET /products`.
+- In-store flow: `POST /shopping-list/start` (choose the market), `POST /shopping-list/cancel` (back to open, nothing lost).
+- `POST /shopping-list/split`: each person gets a block of neighboring corridors with a balanced number of items (linear partition, dynamic programming, checked against brute force). A corridor is never split.
+- `GET /shopping-list?mine=true`: only the items assigned to the logged-in person.
+- `PATCH /shopping-list/items/{id}` also sets `status` (checked, not found, pending), `quantity_bought` (defaults to the quantity needed) and `assigned_user_id`.
+- `POST /shopping-list/checkout`: bought items go into stock, the list is archived, and items not found or still pending move to a new open list.
+- Purchases: `GET /purchases` (history with totals and items still without a price), `GET /purchases/{id}`, `PATCH /purchases/{id}/items/{item_id}` to fill in prices at home.
+- Lock ordering (active list first, then products by id) shared by consume, undo and checkout, to prevent deadlocks. A second simultaneous checkout gets `409` and stock is added once; covered by a test with two real connections, which fails without the lock.
+- 28 new tests (107 in total).
+
+### Changed
+
+- Automatic list updates follow the minimum instead of the ideal; undo removes the automatic item once stock is back above the minimum.
+- While shopping, the list is sorted by the chosen market by default.
+- Demo products have a minimum of half their ideal (whole units for countable items).
+
 ## [0.5.0] - 2026-10-12
 
 ### Added
@@ -87,7 +110,8 @@ While the MVP is in progress, versions stay at `0.x`: each delivered block bumps
 - CI on GitHub Actions: lint, migrations, seed and tests on every push.
 - Documentation: README and data model.
 
-[Unreleased]: https://github.com/RenanGonzales/cella-api/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/RenanGonzales/cella-api/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/RenanGonzales/cella-api/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/RenanGonzales/cella-api/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/RenanGonzales/cella-api/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/RenanGonzales/cella-api/compare/v0.2.0...v0.3.0

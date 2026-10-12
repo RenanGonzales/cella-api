@@ -276,7 +276,7 @@ def test_list_sorted_by_market_corridors_with_other_last(client, db):
     assert names[0] == "Produce"  # first corridor in walking order
     assert names[-1] == "Other"  # Paper Goods has no corridor in this market
     assert view["groups"][-1]["corridor_id"] is None
-    assert view["item_count"] == 18
+    assert view["item_count"] == 15  # products at or under their minimum
     milk = next(i for g in view["groups"] for i in g["items"] if i["name"] == "Whole milk")
     assert milk["last_price_cents"] == 549
     assert milk["brand"] == "Valley Farm"
@@ -381,6 +381,7 @@ def test_simultaneous_consumes_are_not_lost():
             unit=ProductUnit.LITER,
             consume_step=Decimal("1"),
             ideal_quantity=Decimal("2"),
+            min_quantity=Decimal("2"),
             current_quantity=Decimal("10"),
         )
         setup.add(product)

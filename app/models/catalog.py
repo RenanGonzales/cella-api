@@ -56,6 +56,9 @@ class Product(UUIDPrimaryKey, CreatedAt, Base):
         CheckConstraint("consume_step > 0", name="consume_step_positive"),
         CheckConstraint("ideal_quantity >= 0", name="ideal_quantity_non_negative"),
         CheckConstraint("current_quantity >= 0", name="current_quantity_non_negative"),
+        CheckConstraint(
+            "min_quantity >= 0 AND min_quantity <= ideal_quantity", name="min_quantity_range"
+        ),
         enum_check("unit", ProductUnit),
     )
 
@@ -70,7 +73,10 @@ class Product(UUIDPrimaryKey, CreatedAt, Base):
     unit: Mapped[ProductUnit] = mapped_column(str_enum(ProductUnit))
     # Amount removed by one tap on "consume"; also the package size used for rounding.
     consume_step: Mapped[Decimal] = mapped_column(Quantity)
+    # Order-up-to level: how much to have after shopping.
     ideal_quantity: Mapped[Decimal] = mapped_column(Quantity)
+    # Reorder point: when stock reaches it, the product goes on the shopping list.
+    min_quantity: Mapped[Decimal] = mapped_column(Quantity)
     current_quantity: Mapped[Decimal] = mapped_column(Quantity, default=Decimal("0"))
     # Soft delete: archived products disappear from the UI but keep their history.
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

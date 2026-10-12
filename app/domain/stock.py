@@ -16,3 +16,12 @@ def quantity_needed(ideal: Decimal, current: Decimal, package_size: Decimal) -> 
 
     packages = (missing / package_size).to_integral_value(rounding=ROUND_CEILING)
     return packages * package_size
+
+
+def needs_restock(current: Decimal, minimum: Decimal, ideal: Decimal) -> bool:
+    """Reorder point: buy when stock reaches the minimum and is below the ideal.
+
+    Example: milk with ideal 6 and minimum 2 stays off the list at 5, 4 and 3 liters,
+    and goes on it at 2 (to buy 4 and get back to 6).
+    """
+    return current <= minimum and current < ideal

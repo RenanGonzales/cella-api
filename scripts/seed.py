@@ -17,7 +17,7 @@ from app.core.database import SessionLocal
 from app.core.demo import DEMO_INVITE_CODE, DEMO_PASSWORD, DEMO_USERS
 from app.core.security import hash_password
 from app.domain.defaults import DEFAULT_CATEGORIES, DEFAULT_STORAGE_AREAS
-from app.domain.stock import quantity_needed
+from app.domain.stock import needs_restock, quantity_needed
 from app.models import (
     Category,
     ConsumptionEvent,
@@ -95,6 +95,12 @@ PRODUCTS = [
 ]
 
 
+def demo_minimum(unit: str, ideal: Decimal) -> Decimal:
+    """Demo reorder point: half of the ideal (whole units for countable items)."""
+    half = ideal / 2
+    return Decimal(int(half)) if unit == "un" else half
+
+
 def reset_demo(db: Session) -> None:
     """Delete the demo household; foreign keys cascade to everything it owns."""
     db.execute(delete(Household).where(Household.invite_code == DEMO_INVITE_CODE))
@@ -161,6 +167,7 @@ def create_demo(db: Session) -> Household:
             unit=ProductUnit(unit),
             consume_step=Decimal(step),
             ideal_quantity=Decimal(ideal),
+            min_quantity=demo_minimum(unit, Decimal(ideal)),
             current_quantity=Decimal(current),
         )
         db.add(product)
@@ -188,8 +195,8 @@ def create_demo(db: Session) -> Household:
                 )
             )
 
-        needed = quantity_needed(Decimal(ideal), Decimal(current), Decimal(step))
-        if needed > 0:
+        if needs_restock(product.current_quantity, product.min_quantity, product.ideal_quantity):
+            needed = quantity_needed(Decimal(ideal), Decimal(current), Decimal(step))
             db.add(
                 ShoppingListItem(
                     shopping_list_id=open_list.id,
