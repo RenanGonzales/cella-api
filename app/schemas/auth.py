@@ -49,6 +49,20 @@ class TokenResponse(BaseModel):
     expires_in: int = Field(description="Seconds until the token expires")
 
 
+class DemoPartner(BaseModel):
+    """The second person of the demo household, to show two phones side by side."""
+
+    id: uuid.UUID
+    name: str
+    access_token: str
+
+
+class DemoSessionResponse(TokenResponse):
+    """Token of the first demo person (Alex) plus the second one (Sam)."""
+
+    partner: DemoPartner
+
+
 class MemberOut(BaseModel):
     id: uuid.UUID
     name: str

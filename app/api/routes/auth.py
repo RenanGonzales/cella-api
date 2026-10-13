@@ -1,15 +1,23 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import AppSettings, DbSession
 from app.core.config import Settings
-from app.core.demo import DEMO_LOGIN_EMAIL
 from app.core.security import create_access_token, hash_password, verify_password
 from app.domain.invite import generate_invite_code, normalize_invite_code
 from app.models import Household, User
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from app.schemas.auth import (
+    DemoPartner,
+    DemoSessionResponse,
+    LoginRequest,
+    RegisterRequest,
+    TokenResponse,
+)
 from app.services.catalog import add_default_catalog
+from app.services.demo import create_sandbox
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -48,7 +56,8 @@ def register(body: RegisterRequest, db: DbSession, settings: AppSettings) -> Tok
                 Household.invite_code == normalize_invite_code(body.invite_code)
             )
         )
-        if household is None:
+        # Demo copies are deleted after a day: nobody can join one with a real account.
+        if household is None or household.demo_expires_at is not None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Invite code not found")
     else:
         household = _create_household(db, body.household_name)
@@ -89,13 +98,26 @@ def login(body: LoginRequest, db: DbSession, settings: AppSettings) -> TokenResp
     return _token_response(user, settings)
 
 
-@router.post("/demo", response_model=TokenResponse)
-def demo_login(db: DbSession, settings: AppSettings) -> TokenResponse:
-    """Log in as the demo household member, no password needed. Only when DEMO_ENABLED=true."""
+@router.post("/demo", response_model=DemoSessionResponse)
+def demo_login(db: DbSession, settings: AppSettings) -> DemoSessionResponse:
+    """Start a demo: a private copy of the demo household, just for this visitor.
+
+    Returns a token for Alex and one for Sam (the `partner`), so the app can show both
+    phones. The copy and its tokens expire after `DEMO_TTL_HOURS`. Only when DEMO_ENABLED=true.
+    """
     if not settings.demo_enabled:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
 
-    user = db.scalar(select(User).where(User.email == DEMO_LOGIN_EMAIL))
-    if user is None:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Demo data is not loaded")
-    return _token_response(user, settings)
+    _, (alex, sam) = create_sandbox(db, settings)
+    db.commit()
+
+    lifetime = timedelta(hours=settings.demo_ttl_hours)
+    return DemoSessionResponse(
+        access_token=create_access_token(alex.id, settings, lifetime),
+        expires_in=int(lifetime.total_seconds()),
+        partner=DemoPartner(
+            id=sam.id,
+            name=sam.name,
+            access_token=create_access_token(sam.id, settings, lifetime),
+        ),
+    )

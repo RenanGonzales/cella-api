@@ -4,8 +4,6 @@ import jwt
 import pytest
 
 from app.core.config import DEFAULT_JWT_SECRET, Settings
-from app.core.demo import DEMO_LOGIN_EMAIL
-from scripts.seed import create_demo, reset_demo
 
 PASSWORD = "correct horse battery"
 
@@ -146,19 +144,6 @@ def test_me_rejects_a_token_signed_with_another_secret(client, settings):
 
 
 # --- Demo -----------------------------------------------------------------
-
-
-def test_demo_login_enters_the_demo_household(client, db):
-    reset_demo(db)
-    create_demo(db)
-    db.flush()
-
-    response = client.post("/auth/demo")
-
-    assert response.status_code == 200
-    me = client.get("/me", headers=auth_header(response.json()["access_token"])).json()
-    assert me["email"] == DEMO_LOGIN_EMAIL
-    assert len(me["household"]["members"]) == 2
 
 
 def test_demo_login_is_disabled_by_default(client, settings):

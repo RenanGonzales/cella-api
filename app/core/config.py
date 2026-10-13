@@ -21,8 +21,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_days: int = 7
 
-    # Public demo: POST /auth/demo logs in as the demo household member.
+    # Public demo: POST /auth/demo creates a private copy of the demo household per visitor.
     demo_enabled: bool = False
+    demo_ttl_hours: int = 24
+    # Ceiling of live demo copies, so a flood of clicks cannot fill the database.
+    demo_max_sandboxes: int = 500
 
     # Origins allowed to call the API from a browser (the Vite dev server by default).
     cors_origins: list[str] = ["http://localhost:5173"]

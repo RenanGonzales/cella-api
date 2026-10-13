@@ -26,12 +26,15 @@ def verify_password(password: str, password_hash: str | None) -> bool:
     return bcrypt.checkpw(password.encode(), password_hash.encode())
 
 
-def create_access_token(user_id: uuid.UUID, settings: Settings) -> str:
+def create_access_token(
+    user_id: uuid.UUID, settings: Settings, lifetime: timedelta | None = None
+) -> str:
+    """Signed token for the user; `lifetime` overrides the default (e.g. shorter demo sessions)."""
     now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
         "iat": now,
-        "exp": now + timedelta(days=settings.access_token_expire_days),
+        "exp": now + (lifetime or timedelta(days=settings.access_token_expire_days)),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 

@@ -7,6 +7,27 @@ While the MVP is in progress, versions stay at `0.x`: each delivered block bumps
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-12
+
+A private demo per visitor, so several people can try Cella at the same time.
+
+### Changed
+
+- `POST /auth/demo` now creates a private copy of the demo household for each visitor (same data: Alex and Sam, 35 products, a market with 10 corridors, an open list of 15 items) and returns a token for Alex plus a `partner` with Sam's token, so the frontend can show two phones.
+- Demo copies and their tokens expire after `DEMO_TTL_HOURS` (24 by default). Expired copies are deleted when the next demo starts; `scripts/cleanup_demo.py` does the same for a cron job.
+- The demo household data moved to `app/services/demo.py`; `scripts/seed.py` keeps creating the local demo with fixed logins for development.
+
+### Added
+
+- `households.demo_expires_at` (migration `3e8fd442e752`), null for real households.
+- `DEMO_MAX_SANDBOXES` (500 by default): new demos get `503` while that many copies are live.
+- Tests for the isolation between visitors, expiry, cleanup, the cap and invite codes (113 tests).
+
+### Security
+
+- Demo copies cannot be joined with their invite code, so no real account ends up in a household that is deleted the next day.
+- Demo people have a random, never-revealed password: the copies can only be entered through their own tokens.
+
 ## [0.6.0] - 2026-10-12
 
 Completes the backend of the MVP.
@@ -111,6 +132,7 @@ Completes the backend of the MVP.
 - Documentation: README and data model.
 
 [Unreleased]: https://github.com/RenanGonzales/cella-api/compare/v0.6.0...HEAD
+[0.7.0]: https://github.com/RenanGonzales/cella-api/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/RenanGonzales/cella-api/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/RenanGonzales/cella-api/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/RenanGonzales/cella-api/compare/v0.3.0...v0.4.0

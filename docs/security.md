@@ -22,13 +22,16 @@ Format: **threat -> protection -> trade-off**.
 | Guessable invite codes | 8 random characters from a 31-symbol alphabet (about 850 billion combinations), generated with `secrets` | `app/domain/invite.py` |
 | Duplicate accounts | Emails are normalized to lowercase and enforced unique by the database, including concurrent sign-ups | `app/api/routes/auth.py` |
 | Demo login abused outside the demo | `POST /auth/demo` only exists when `DEMO_ENABLED=true` | `app/api/routes/auth.py` |
+| Demo visitors seeing each other's data | Each visitor gets a private copy of the demo household; the usual household scoping (`404` across households) keeps copies apart | `app/services/demo.py` |
+| Demo copies filling the database | Copies expire after 24 hours and are deleted on the next demo (or by `scripts/cleanup_demo.py`); at most `DEMO_MAX_SANDBOXES` live copies, then `503` | `app/services/demo.py` |
+| Real accounts inside a temporary demo | Invite codes of demo copies are rejected at sign-up | `app/api/routes/auth.py` |
 | Cross-origin requests | CORS only allows the local dev frontend; in production the frontend and the API share one origin | `app/main.py` |
 
 ## Known trade-offs (demo mode)
 
 - **Token in `localStorage`.** Simple for the frontend, but any XSS bug could read it.
 - **One long-lived token (7 days), no server-side sessions.** A leaked token stays valid until it expires, and logout only deletes the token on the device.
-- **No rate limiting on login.** Password guessing is only slowed down by bcrypt's cost.
+- **No rate limiting on login or on new demos.** Password guessing is only slowed down by bcrypt's cost, and new demos only by the cap on live copies. In production, Nginx `limit_req` covers both until the API has its own limiter.
 - **No email verification or password reset.** Anyone can sign up with any email address.
 
 ## Production roadmap
