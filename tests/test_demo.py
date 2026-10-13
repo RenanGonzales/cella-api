@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 import jwt
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.models import Household
 from app.services.demo import PRODUCTS, delete_expired_sandboxes
@@ -92,15 +92,18 @@ def test_cleanup_keeps_real_and_local_demo_households(client, db, owner):
     local_demo = create_demo(db)
     db.flush()
 
-    deleted = delete_expired_sandboxes(db, datetime.now(UTC) + timedelta(days=365))
+    # Even far in the future, only demo copies expire (other sandboxes may exist in the
+    # database, so the test checks what must survive rather than a count).
+    delete_expired_sandboxes(db, datetime.now(UTC) + timedelta(days=365))
 
-    assert deleted == 0
+    db.expire_all()
     assert db.get(Household, local_demo.id) is not None
     assert client.get("/me", headers=owner).status_code == 200
 
 
-def test_live_copies_are_capped(client, settings):
-    settings.demo_max_sandboxes = 1
+def test_live_copies_are_capped(client, db, settings):
+    live = db.scalar(select(func.count()).where(Household.demo_expires_at.is_not(None)))
+    settings.demo_max_sandboxes = live + 1
     start_demo(client)
 
     response = client.post("/auth/demo")

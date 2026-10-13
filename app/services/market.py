@@ -6,13 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.models import Category, Corridor, CorridorCategory, Market
 from app.schemas.catalog import CategoryOut
-from app.schemas.market import LayoutCorridorOut, LayoutIn, LayoutOut
+from app.schemas.market import ROUTE_ENDS, LayoutCorridorOut, LayoutIn, LayoutOut, PlanSize
 
 
 def corridor_counts(db: Session, market_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    """Corridors that hold products (entrance and checkout are not counted)."""
     rows = db.execute(
         select(Corridor.market_id, func.count())
-        .where(Corridor.market_id.in_(market_ids))
+        .where(Corridor.market_id.in_(market_ids), Corridor.kind.not_in(ROUTE_ENDS))
         .group_by(Corridor.market_id)
     ).all()
     return dict(rows)
@@ -39,13 +40,21 @@ def read_layout(db: Session, market: Market) -> LayoutOut:
         select(Category).where(Category.household_id == market.household_id).order_by(Category.name)
     ).all()
 
+    has_plan = market.plan_cols is not None and market.plan_rows is not None
     return LayoutOut(
         market_id=market.id,
+        plan=PlanSize(cols=market.plan_cols, rows=market.plan_rows) if has_plan else None,
+        route_style=market.route_style,
         corridors=[
             LayoutCorridorOut(
                 id=corridor.id,
                 name=corridor.name,
                 position=corridor.position,
+                kind=corridor.kind,
+                x=corridor.x,
+                y=corridor.y,
+                w=corridor.w,
+                h=corridor.h,
                 categories=by_corridor[corridor.id],
             )
             for corridor in corridors
@@ -97,15 +106,21 @@ def replace_layout(db: Session, market: Market, layout: LayoutIn) -> None:
             db.delete(corridor)
     db.flush()
 
+    market.plan_cols = layout.plan.cols if layout.plan else None
+    market.plan_rows = layout.plan.rows if layout.plan else None
+    market.route_style = layout.route_style
+
     for position, item in enumerate(layout.corridors):
         if item.id is not None:
             corridor = existing[item.id]
-            corridor.name = item.name
-            corridor.position = position
         else:
-            corridor = Corridor(market_id=market.id, name=item.name, position=position)
+            corridor = Corridor(market_id=market.id)
             db.add(corridor)
-            db.flush()
+        corridor.name = item.name
+        corridor.position = position
+        corridor.kind = item.kind
+        corridor.x, corridor.y, corridor.w, corridor.h = item.x, item.y, item.w, item.h
+        db.flush()
 
         db.add_all(
             CorridorCategory(market_id=market.id, corridor_id=corridor.id, category_id=cid)

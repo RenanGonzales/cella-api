@@ -7,6 +7,27 @@ While the MVP is in progress, versions stay at `0.x`: each delivered block bumps
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-12
+
+Market floor plans.
+
+### Added
+
+- A market can have a floor plan: a grid (4 to 40 cells wide, 4 to 30 deep) where each corridor has a kind (`aisle`, `wall`, `island`, `entrance`, `checkout`) and a place (`x`, `y`, `w`, `h`). `GET/PUT /markets/{id}/layout` read and save it with `plan` and `route_style` (`column` or `block`).
+- Validation: pieces inside the grid and never overlapping, all placed or none, at most one entrance and one checkout, which hold no categories.
+- `MarketOut.has_plan`; `corridor_count` leaves the entrance and checkout out.
+- The demo market comes with a plan (21 x 10, zigzag from the entrance).
+- Migration `878621be9a28` (existing markets stay plain lists, existing corridors become aisles).
+- Tests: 126 in total.
+
+### Changed
+
+- Up to 100 corridors per market (was 60), for big wholesale stores.
+
+### Fixed
+
+- Two demo tests no longer depend on other demo copies existing in the same database.
+
 ## [0.7.0] - 2026-10-12
 
 A private demo per visitor, so several people can try Cella at the same time.
@@ -132,6 +153,7 @@ Completes the backend of the MVP.
 - Documentation: README and data model.
 
 [Unreleased]: https://github.com/RenanGonzales/cella-api/compare/v0.6.0...HEAD
+[0.8.0]: https://github.com/RenanGonzales/cella-api/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/RenanGonzales/cella-api/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/RenanGonzales/cella-api/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/RenanGonzales/cella-api/compare/v0.4.0...v0.5.0

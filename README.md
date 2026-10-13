@@ -18,7 +18,7 @@ Backend for **Cella**, a household supplies manager. Track what you have at home
 
 - Household inventory, organized by storage area (fridge, pantry, bathroom, laundry...)
 - One-tap consumption that updates stock and adds the item to the shopping list
-- Shopping list sorted by the corridors of the selected market
+- Market floor plans: aisles, walls, islands, entrance and checkout on a grid; the walking order sorts the shopping list
 - List split between household members by blocks of neighboring corridors
 - Minimum (reorder point) and ideal stock per product
 - In-store checkout: confirm quantities, update stock, archive the list, carry over what was missing
@@ -78,7 +78,7 @@ uvicorn app.main:app --reload        # http://localhost:8000/docs
 | GET, POST | `/markets` | List or create markets |
 | GET, PATCH, DELETE | `/markets/{id}` | Read, update, or delete a market never used for shopping |
 | POST | `/markets/{id}/archive`, `/restore` | Hide a market while keeping its prices, or bring it back |
-| GET, PUT | `/markets/{id}/layout` | Read or save (all at once) the corridors and their categories |
+| GET, PUT | `/markets/{id}/layout` | Read or save (all at once) the floor plan: corridors in walking order, their place on the grid and their categories |
 | POST | `/products/{id}/consume` | Consume one step (or a quantity); updates the shopping list |
 | POST | `/consumption-events/{id}/undo` | Undo a mistaken consume (10 minutes, same user) |
 | GET | `/shopping-list` | Active list, grouped by a market's corridors (`?market_id=`) or by category; `?mine=true` for your route |

@@ -3,7 +3,13 @@
 from app.models.base import Base
 from app.models.catalog import Category, Product, StorageArea
 from app.models.consumption import ConsumptionEvent
-from app.models.enums import ProductUnit, ShoppingListItemStatus, ShoppingListStatus
+from app.models.enums import (
+    CorridorKind,
+    ProductUnit,
+    RouteStyle,
+    ShoppingListItemStatus,
+    ShoppingListStatus,
+)
 from app.models.household import Household
 from app.models.market import Corridor, CorridorCategory, Market
 from app.models.shopping import ShoppingList, ShoppingListItem
@@ -15,10 +21,12 @@ __all__ = [
     "ConsumptionEvent",
     "Corridor",
     "CorridorCategory",
+    "CorridorKind",
     "Household",
     "Market",
     "Product",
     "ProductUnit",
+    "RouteStyle",
     "ShoppingList",
     "ShoppingListItem",
     "ShoppingListItemStatus",

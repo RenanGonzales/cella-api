@@ -25,6 +25,7 @@ from app.models import (
     ConsumptionEvent,
     Corridor,
     CorridorCategory,
+    CorridorKind,
     Household,
     Market,
     Product,
@@ -44,19 +45,24 @@ INVITE_CODE_ATTEMPTS = 5
 STORAGE_AREAS = DEFAULT_STORAGE_AREAS
 CATEGORIES = DEFAULT_CATEGORIES
 
-# Corridors in walking order and the categories found in each one.
+# The demo market's floor plan: a 21 x 10 grid walked in zigzag from the entrance
+# (up the first corridor, down the next one...). Listed in walking order, with the kind
+# of piece, its place on the grid (x, y, w, h) and the categories found there.
 # "Paper Goods" is intentionally left unmapped to show the "Other" group.
+PLAN_COLS, PLAN_ROWS = 21, 10
 CORRIDORS = [
-    ("Produce", ["Produce"]),
-    ("Bakery", ["Bakery"]),
-    ("Grains & Canned", ["Grains & Pasta", "Canned & Sauces"]),
-    ("Breakfast & Snacks", ["Breakfast", "Snacks"]),
-    ("Beverages", ["Beverages"]),
-    ("Cleaning", ["Cleaning"]),
-    ("Personal Care", ["Personal Care"]),
-    ("Meat", ["Meat"]),
-    ("Dairy", ["Dairy"]),
-    ("Frozen", ["Frozen"]),
+    ("Entrance", CorridorKind.ENTRANCE, (0, 9, 3, 1), []),
+    ("Produce", CorridorKind.ISLAND, (0, 1, 2, 7), ["Produce"]),
+    ("Bakery", CorridorKind.AISLE, (3, 1, 1, 7), ["Bakery"]),
+    ("Grains & Canned", CorridorKind.AISLE, (5, 1, 1, 7), ["Grains & Pasta", "Canned & Sauces"]),
+    ("Breakfast & Snacks", CorridorKind.AISLE, (7, 1, 1, 7), ["Breakfast", "Snacks"]),
+    ("Beverages", CorridorKind.AISLE, (9, 1, 1, 7), ["Beverages"]),
+    ("Cleaning", CorridorKind.AISLE, (11, 1, 1, 7), ["Cleaning"]),
+    ("Personal Care", CorridorKind.AISLE, (13, 1, 1, 7), ["Personal Care"]),
+    ("Meat", CorridorKind.AISLE, (15, 1, 1, 7), ["Meat"]),
+    ("Dairy", CorridorKind.AISLE, (17, 1, 1, 7), ["Dairy"]),
+    ("Frozen", CorridorKind.WALL, (19, 1, 2, 7), ["Frozen"]),
+    ("Checkout", CorridorKind.CHECKOUT, (12, 9, 7, 1), []),
 ]
 
 # name, brand, category, storage area, unit, consume step, ideal, current, price (cents per unit)
@@ -133,12 +139,18 @@ def build_demo_household(
     categories = {name: Category(household_id=household.id, name=name) for name in CATEGORIES}
     db.add_all([*users, *areas.values(), *categories.values()])
 
-    market = Market(household_id=household.id, name="Neighborhood Market")
+    market = Market(
+        household_id=household.id,
+        name="Neighborhood Market",
+        plan_cols=PLAN_COLS,
+        plan_rows=PLAN_ROWS,
+    )
     db.add(market)
     db.flush()
 
-    for position, (corridor_name, category_names) in enumerate(CORRIDORS):
-        corridor = Corridor(market_id=market.id, name=corridor_name, position=position)
+    for position, (corridor_name, kind, (x, y, w, h), category_names) in enumerate(CORRIDORS):
+        corridor = Corridor(market_id=market.id, name=corridor_name, position=position, kind=kind)
+        corridor.x, corridor.y, corridor.w, corridor.h = x, y, w, h
         db.add(corridor)
         db.flush()
         for category_name in category_names:

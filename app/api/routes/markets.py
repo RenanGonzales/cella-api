@@ -22,6 +22,7 @@ def _to_out(market: Market, corridor_count: int) -> MarketOut:
         chain=market.chain,
         address=market.address,
         corridor_count=corridor_count,
+        has_plan=market.plan_cols is not None,
         archived_at=market.archived_at,
     )
 

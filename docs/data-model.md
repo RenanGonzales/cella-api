@@ -37,10 +37,14 @@ consumption_events                 -- history for stock autonomy forecasts
 
 markets                            -- a store as one household knows it
   id, household_id -> households, name, chain (nullable), address (nullable),
-  archived_at (nullable), created_at
+  archived_at (nullable), created_at,
+  plan_cols, plan_rows (nullable)  -- floor plan grid; null = plain list of corridors
+  route_style                      -- column | block (zigzag with two blocks of aisles)
 
-corridors
-  id, market_id -> markets, name, position
+corridors                          -- a piece of the floor plan
+  id, market_id -> markets, name, position (walking order),
+  kind                             -- aisle | wall | island | entrance | checkout
+  x, y, w, h (nullable)            -- place on the grid, in cells
 
 corridor_categories                -- category -> corridor, per market
   id, market_id -> markets, corridor_id -> corridors, category_id -> categories
@@ -72,6 +76,7 @@ A product's "last price" is not stored: it is the `unit_price_cents` from its mo
 8. **New household:** starts with default storage areas and categories (`app/domain/defaults.py`), named in English and translated by the frontend.
 9. **Delete storage area or category:** only when no product (archived included) uses it; otherwise `409`.
 10. **Market layout:** saved as a whole (`PUT /markets/{id}/layout`) in one transaction. Corridors sent with an id keep it; corridors left out are deleted; a category is in at most one corridor per market.
+11. **Floor plan:** with `plan`, every corridor has a place on the grid (inside it, never overlapping another one); entrance and checkout appear at most once and hold no categories. The order sent is the walking order: the web editor computes a zigzag from the entrance (column by column, or block by block in stores with a cross aisle) or takes the order picked by hand. The API checks the geometry; the shopping list only needs `position`.
 11. **Delete market:** only if it was never used for shopping; otherwise archive it to keep its prices.
 
 12. **Manual items win:** an item added or edited by hand (`added_manually`) is never lowered or removed by consume or undo.
