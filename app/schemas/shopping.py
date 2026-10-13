@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.models import ProductUnit, ShoppingListItemStatus, ShoppingListStatus
+from app.models import ProductUnit, ReceiptSource, ShoppingListItemStatus, ShoppingListStatus
 from app.schemas.catalog import JsonDecimal, NonNegativeQuantity, PositiveQuantity, ProductOut
 
 # --- Consumption ----------------------------------------------------------
@@ -62,7 +62,9 @@ class ShoppingListItemUpdate(BaseModel):
 
 
 class StartShoppingRequest(BaseModel):
-    market_id: uuid.UUID
+    """`market_id` null: shopping somewhere without a saved plan (list grouped by category)."""
+
+    market_id: uuid.UUID | None = None
 
 
 class SplitRequest(BaseModel):
@@ -92,6 +94,10 @@ class ShoppingListItemOut(BaseModel):
     added_manually: bool
     assigned_user_id: uuid.UUID | None
     last_price_cents: int | None = Field(description="Price per unit in the last purchase")
+    # The product's stock, so the list can show why the item is there and how much is enough.
+    current_quantity: JsonDecimal
+    min_quantity: JsonDecimal
+    ideal_quantity: JsonDecimal
 
 
 class ShoppingListGroup(BaseModel):
@@ -123,6 +129,9 @@ class PurchaseSummary(BaseModel):
     items_bought: int
     items_without_price: int
     total_cents: int = Field(description="Sum of quantity x unit price of priced items")
+    receipt_source: ReceiptSource | None = Field(description="Set once a receipt is confirmed")
+    receipt_total_cents: int | None
+    paid_cents: int = Field(description="The receipt's total when there is one, else total_cents")
 
 
 class PurchaseItemOut(BaseModel):

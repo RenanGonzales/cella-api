@@ -42,6 +42,7 @@ def _summary_fields(db: Session, purchase: ShoppingList, rows) -> dict:
     bought = [item for item, _ in rows if item.status == ShoppingListItemStatus.CHECKED]
     totals = [line_total_cents(item.quantity_bought, item.unit_price_cents) for item in bought]
     market = db.get(Market, purchase.market_id) if purchase.market_id else None
+    total = sum(total for total in totals if total is not None)
     return {
         "id": purchase.id,
         "market_id": purchase.market_id,
@@ -50,7 +51,12 @@ def _summary_fields(db: Session, purchase: ShoppingList, rows) -> dict:
         "completed_at": purchase.completed_at,
         "items_bought": len(bought),
         "items_without_price": sum(total is None for total in totals),
-        "total_cents": sum(total for total in totals if total is not None),
+        "total_cents": total,
+        "receipt_source": purchase.receipt_source,
+        "receipt_total_cents": purchase.receipt_total_cents,
+        "paid_cents": purchase.receipt_total_cents
+        if purchase.receipt_total_cents is not None
+        else total,
     }
 
 

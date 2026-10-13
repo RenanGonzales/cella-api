@@ -7,6 +7,38 @@ While the MVP is in progress, versions stay at `0.x`: each delivered block bumps
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-13
+
+Receipts, spending and history.
+
+### Added
+
+- Receipts of past purchases:
+  - `GET /purchases/{id}/receipt/sample`: a believable receipt for what was bought (store-style names, prices that moved a little since the last visit, a line that is not a product). The same purchase always gives the same receipt.
+  - `POST /purchases/{id}/receipt/read`: reads a photo with Claude (Haiku by default) and suggests a product of the household for each line, with the previous price. Off by default; only for the emails in `RECEIPT_AI_EMAILS`, never for demo households. The photo is not stored.
+  - `PUT /purchases/{id}/receipt`: saves the reviewed prices (only products bought on that trip, one price each) and the total paid. The prices become each product's last price.
+- `GET /stats/spending`: paid per month in a time zone, months without purchases included.
+- `GET /stats/consumption`: what was used in the last days, most used first.
+- `GET /products/{id}/prices`: prices paid in the last purchases, for a price chart.
+- `GET /me` reports `features` (`receipt_ai`, `is_demo`).
+- Purchases report `receipt_source`, `receipt_total_cents` and `paid_cents`.
+- The demo household now has three months of purchases (12 trips, some without a market), with prices a little lower in the past.
+- Docs: [decision on reading receipts with Claude](docs/decisions/receipt-reading.md) and [cost to run](docs/cost-to-run.md).
+- Settings: `RECEIPT_AI_ENABLED`, `ANTHROPIC_API_KEY`, `RECEIPT_AI_MODEL`, `RECEIPT_AI_EMAILS`.
+- Tests: 147 in total (the Claude call is replaced in tests, so they cost nothing).
+
+### Migration
+
+- `b7c1d2e3f4a5`: `shopping_lists.receipt_source` and `receipt_total_cents`.
+
+## [0.9.0] - 2026-10-12
+
+### Added
+
+- Shopping list items carry the product's stock (`current_quantity`, `min_quantity`, `ideal_quantity`), so the list can show why an item is there and how much is enough.
+- Shopping without a market: `POST /shopping-list/start` accepts `market_id: null` (or no body field). The list is then grouped by category, and splitting the route gives each person whole categories, balanced by number of items.
+- Tests: 130 in total.
+
 ## [0.8.0] - 2026-10-12
 
 Market floor plans.
@@ -152,7 +184,9 @@ Completes the backend of the MVP.
 - CI on GitHub Actions: lint, migrations, seed and tests on every push.
 - Documentation: README and data model.
 
-[Unreleased]: https://github.com/RenanGonzales/cella-api/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/RenanGonzales/cella-api/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/RenanGonzales/cella-api/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/RenanGonzales/cella-api/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/RenanGonzales/cella-api/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/RenanGonzales/cella-api/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/RenanGonzales/cella-api/compare/v0.5.0...v0.6.0

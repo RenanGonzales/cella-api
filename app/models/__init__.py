@@ -6,6 +6,7 @@ from app.models.consumption import ConsumptionEvent
 from app.models.enums import (
     CorridorKind,
     ProductUnit,
+    ReceiptSource,
     RouteStyle,
     ShoppingListItemStatus,
     ShoppingListStatus,
@@ -26,6 +27,7 @@ __all__ = [
     "Market",
     "Product",
     "ProductUnit",
+    "ReceiptSource",
     "RouteStyle",
     "ShoppingList",
     "ShoppingListItem",

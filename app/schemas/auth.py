@@ -75,8 +75,16 @@ class HouseholdOut(BaseModel):
     members: list[MemberOut]
 
 
+class FeaturesOut(BaseModel):
+    """What this account may use, so the app only shows what works."""
+
+    receipt_ai: bool
+    is_demo: bool
+
+
 class MeResponse(BaseModel):
     id: uuid.UUID
     name: str
     email: str
     household: HouseholdOut
+    features: FeaturesOut

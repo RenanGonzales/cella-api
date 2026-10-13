@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     # Ceiling of live demo copies, so a flood of clicks cannot fill the database.
     demo_max_sandboxes: int = 500
 
+    # Receipt reading with Claude (vision). Off by default and never on demo households;
+    # only the emails listed here may use it, so the API key is never open to the public.
+    receipt_ai_enabled: bool = False
+    anthropic_api_key: str | None = None
+    receipt_ai_model: str = "claude-haiku-5-5"
+    receipt_ai_emails: list[str] = []
+
     # Origins allowed to call the API from a browser (the Vite dev server by default).
     cors_origins: list[str] = ["http://localhost:5173"]
 

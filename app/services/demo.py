@@ -30,6 +30,7 @@ from app.models import (
     Market,
     Product,
     ProductUnit,
+    ReceiptSource,
     ShoppingList,
     ShoppingListItem,
     ShoppingListItemStatus,
@@ -37,6 +38,7 @@ from app.models import (
     StorageArea,
     User,
 )
+from app.services.shopping_flow import line_total_cents
 
 DEMO_PEOPLE = ["Alex", "Sam"]
 SANDBOX_EMAIL_DOMAIN = "sandbox.cella.app"
@@ -120,7 +122,8 @@ def build_demo_household(
     expires_at: datetime | None,
 ) -> tuple[Household, list[User]]:
     """Create the demo household: people, areas, a market with corridors, 35 products,
-    last week's purchase (for prices), some consumption history and an open list."""
+    three months of purchases (prices and spending), some consumption history and an
+    open list."""
     rng = random.Random(42)  # deterministic demo data
     now = datetime.now(UTC)
 
@@ -169,12 +172,15 @@ def build_demo_household(
         status=ShoppingListStatus.ARCHIVED,
         started_at=now - timedelta(days=7, hours=1),
         completed_at=now - timedelta(days=7),
+        receipt_source=ReceiptSource.SAMPLE,
     )
     # Current list: products below their ideal stock.
     open_list = ShoppingList(household_id=household.id, status=ShoppingListStatus.OPEN)
     db.add_all([last_purchase, open_list])
     db.flush()
 
+    receipt_total = 0
+    priced: list[tuple[Product, int]] = []
     for name, brand, category, area, unit, step, ideal, current, price in PRODUCTS:
         product = Product(
             household_id=household.id,
@@ -201,6 +207,8 @@ def build_demo_household(
                 status=ShoppingListItemStatus.CHECKED,
             )
         )
+        receipt_total += line_total_cents(Decimal(step), price) or 0
+        priced.append((product, price))
 
         # A few consumption events over the last two weeks, for autonomy forecasts.
         for _ in range(rng.randint(0, 4)):
@@ -223,8 +231,59 @@ def build_demo_household(
                 )
             )
 
+    last_purchase.receipt_total_cents = receipt_total + SHOPPING_BAG_CENTS
+    _add_purchase_history(db, household.id, market.id, priced, now)
     db.flush()
     return household, users
+
+
+SHOPPING_BAG_CENTS = 15
+# Days ago of the earlier trips: a big one each month and smaller ones in between.
+HISTORY_DAYS_AGO = (14, 21, 29, 36, 43, 50, 59, 66, 73, 80, 89)
+PRICE_DRIFT_PER_WEEK = 0.003  # prices were a little lower in the past
+
+
+def _add_purchase_history(
+    db: Session,
+    household_id: uuid.UUID,
+    market_id: uuid.UUID,
+    priced: list[tuple[Product, int]],
+    now: datetime,
+) -> None:
+    """Earlier trips, so history, spending per month and price charts have something to show."""
+    rng = random.Random(7)  # deterministic, separate from the consumption draws
+    for index, days_ago in enumerate(HISTORY_DAYS_AGO):
+        big_trip = index % 3 == 2
+        trip = ShoppingList(
+            household_id=household_id,
+            # Now and then a trip somewhere else, without a market.
+            market_id=None if index % 4 == 1 else market_id,
+            status=ShoppingListStatus.ARCHIVED,
+            started_at=now - timedelta(days=days_ago, hours=1, minutes=rng.randint(0, 40)),
+            completed_at=now - timedelta(days=days_ago),
+        )
+        db.add(trip)
+        db.flush()
+        total = 0
+        size = rng.randint(18, 26) if big_trip else rng.randint(6, 12)
+        for product, price in rng.sample(priced, size):
+            drift = 1 - PRICE_DRIFT_PER_WEEK * days_ago / 7
+            past_price = max(9, int(round(price * drift * rng.uniform(0.95, 1.05))))
+            quantity = product.consume_step * rng.choice((1, 1, 2))
+            db.add(
+                ShoppingListItem(
+                    shopping_list_id=trip.id,
+                    product_id=product.id,
+                    quantity_needed=quantity,
+                    quantity_bought=quantity,
+                    unit_price_cents=past_price,
+                    status=ShoppingListItemStatus.CHECKED,
+                )
+            )
+            total += line_total_cents(quantity, past_price) or 0
+        if index % 2 == 0:
+            trip.receipt_source = ReceiptSource.SAMPLE
+            trip.receipt_total_cents = total + SHOPPING_BAG_CENTS
 
 
 # --- Per-visitor sandboxes ---------------------------------------------------

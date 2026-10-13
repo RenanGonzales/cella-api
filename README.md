@@ -22,8 +22,9 @@ Backend for **Cella**, a household supplies manager. Track what you have at home
 - List split between household members by blocks of neighboring corridors
 - Minimum (reorder point) and ideal stock per product
 - In-store checkout: confirm quantities, update stock, archive the list, carry over what was missing
-- Purchase history with totals; prices filled in at home
-- Purchase and consumption history stored for future analytics (monthly spending, price tracking, stock autonomy)
+- Purchase history with totals, spending per month and the price history of each product
+- Receipts: prices read from a photo by Claude (only for listed accounts) or, in the demo, a sample receipt; always reviewed before saving
+- What was used in the last days, from the consumption history
 
 ## Getting started
 
@@ -66,7 +67,7 @@ uvicorn app.main:app --reload        # http://localhost:8000/docs
 | POST | `/auth/register` | Create an account and a household, or join one with an invite code |
 | POST | `/auth/login` | Log in with email and password |
 | POST | `/auth/demo` | Start a private demo: a copy of the demo household for this visitor, with tokens for Alex and Sam (when `DEMO_ENABLED=true`) |
-| GET | `/me` | Logged-in user, household and members |
+| GET | `/me` | Logged-in user, household, members and the features the account can use |
 | GET, POST | `/storage-areas` | List or create storage areas (fridge, pantry...) |
 | PATCH, DELETE | `/storage-areas/{id}` | Rename or delete an empty storage area |
 | PUT | `/storage-areas/order` | Reorder the home grid |
@@ -84,11 +85,17 @@ uvicorn app.main:app --reload        # http://localhost:8000/docs
 | GET | `/shopping-list` | Active list, grouped by a market's corridors (`?market_id=`) or by category; `?mine=true` for your route |
 | POST | `/shopping-list/items` | Add a product by hand |
 | PATCH, DELETE | `/shopping-list/items/{id}` | Change quantity; in the store, check, mark not found or reassign; or remove |
-| POST | `/shopping-list/start`, `/cancel` | Start shopping at a market, or leave without buying |
+| POST | `/shopping-list/start`, `/cancel` | Start shopping at a market (or none: list by category), or leave without buying |
 | POST | `/shopping-list/split` | Split the route between people by blocks of corridors |
 | POST | `/shopping-list/checkout` | Finish: stock updated, list archived, missing items carried over |
-| GET | `/purchases`, `/purchases/{id}` | Purchase history with totals |
+| GET | `/purchases`, `/purchases/{id}` | Purchase history with totals and what was paid |
 | PATCH | `/purchases/{id}/items/{item_id}` | Fill in the price paid |
+| GET | `/purchases/{id}/receipt/sample` | A sample receipt for what was bought (nothing is saved) |
+| POST | `/purchases/{id}/receipt/read` | Read a photo of the receipt with Claude (listed accounts only; nothing is saved) |
+| PUT | `/purchases/{id}/receipt` | Save the reviewed receipt: prices and total paid |
+| GET | `/products/{id}/prices` | Prices paid in the last purchases |
+| GET | `/stats/spending` | Paid per month (`?months=6&tz=America/Sao_Paulo`) |
+| GET | `/stats/consumption` | What was used in the last days (`?days=7`) |
 | GET | `/health` | Status and version |
 
 Protected routes expect `Authorization: Bearer <token>`. Interactive docs at `/docs`.
@@ -119,6 +126,8 @@ tests/
 
 - [Data model](docs/data-model.md)
 - [Security](docs/security.md)
+- [Decision: reading receipts with Claude](docs/decisions/receipt-reading.md)
+- [Cost to run](docs/cost-to-run.md)
 - [Changelog](CHANGELOG.md)
 
 ## Related

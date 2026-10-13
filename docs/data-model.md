@@ -52,7 +52,8 @@ corridor_categories                -- category -> corridor, per market
 
 shopping_lists
   id, household_id -> households, market_id -> markets (nullable until shopping starts),
-  status (open | shopping | archived), created_at, started_at, completed_at
+  status (open | shopping | archived), created_at, started_at, completed_at,
+  receipt_source (sample | ai | manual, nullable), receipt_total_cents (nullable)
 
 shopping_list_items
   id, shopping_list_id -> shopping_lists, product_id -> products,
@@ -68,7 +69,7 @@ A product's "last price" is not stored: it is the `unit_price_cents` from its mo
 
 1. **Consume:** `current_quantity -= consume_step` (never below zero) and a `consumption_event` is recorded. When stock reaches the minimum (`current_quantity <= min_quantity` and below the ideal), the item is created or updated in the active list with `quantity_needed = ideal_quantity - current_quantity`, rounded up to whole packages (`consume_step` is the package size). Example: milk with ideal 6 and minimum 2 goes on the list at 2, asking for 4. `min_quantity` defaults to the ideal. See `app/domain/stock.py`.
 2. **One active list per household:** at most one list with status `open` or `shopping`, enforced by a partial unique index. Consuming during shopping adds the item to the list in progress as `pending`.
-3. **Start shopping:** a market is selected, the list becomes `shopping` and is sorted by `corridors.position`. Categories without a corridor in that market go to an "Other" group at the end.
+3. **Start shopping:** a market is selected (or none), the list becomes `shopping` and is sorted by `corridors.position`. Categories without a corridor in that market go to an "Other" group at the end. Without a market the list goes category by category, and the split gives whole categories.
 4. **Split:** `assigned_user_id` is filled by blocks of neighboring corridors, minimizing the largest number of items any one person gets (linear partition, `app/domain/split.py`). A corridor is never split; items in the cart keep their person; it can be changed by hand.
 5. **Checkout:** `checked` items add `quantity_bought` to stock. The list becomes `archived`. `not_found` and `pending` items are carried over to a new `open` list.
 6. **Fine-tuning at home:** brand and `unit_price_cents` are edited on the archived list.
@@ -81,6 +82,7 @@ A product's "last price" is not stored: it is the `unit_price_cents` from its mo
 
 12. **Manual items win:** an item added or edited by hand (`added_manually`) is never lowered or removed by consume or undo.
 13. **Undo:** within 10 minutes and only by the person who consumed. Restores stock, shrinks or removes the automatic pending item, and deletes the event (a mistaken tap is not consumption).
+14. **Receipt:** a draft (sample or read by Claude) is never stored. Confirming it (`PUT /purchases/{id}/receipt`) sets `unit_price_cents` on the items bought, only products checked on that trip, one price each, and stores the source and total. What was paid in a month is the receipt total when there is one, otherwise the sum of priced items.
 
 ## Concurrency
 

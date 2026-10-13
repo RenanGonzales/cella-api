@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.split import split_corridors
 from app.models import (
+    Category,
     Corridor,
     CorridorCategory,
     Market,
@@ -56,11 +57,13 @@ def household_member(db: Session, household_id: uuid.UUID, user_id: uuid.UUID) -
 # --- Start and cancel -----------------------------------------------------
 
 
-def start_shopping(db: Session, user: User, market_id: uuid.UUID) -> ShoppingList:
-    """Choose the market and mark the list as in progress (can be called again to switch)."""
-    market = get_owned(db, Market, market_id, user.household_id, "Market")
-    if market.archived_at is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Market is archived")
+def start_shopping(db: Session, user: User, market_id: uuid.UUID | None) -> ShoppingList:
+    """Choose the market (or none) and mark the list as in progress; can be called again
+    to switch. Without a market the list is walked category by category."""
+    if market_id is not None:
+        market = get_owned(db, Market, market_id, user.household_id, "Market")
+        if market.archived_at is not None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Market is archived")
 
     active = _require_active(db, user.household_id)
     if not _items(db, active.id):
@@ -69,7 +72,7 @@ def start_shopping(db: Session, user: User, market_id: uuid.UUID) -> ShoppingLis
     if active.status == ShoppingListStatus.OPEN:
         active.started_at = datetime.now(UTC)
     active.status = ShoppingListStatus.SHOPPING
-    active.market_id = market.id
+    active.market_id = market_id
     return active
 
 
@@ -101,7 +104,29 @@ def split_list(db: Session, user: User, user_ids: list[uuid.UUID]) -> ShoppingLi
 
     active = _require_shopping(db, user.household_id)
 
-    # Items still to pick up, with the position of their corridor in this market.
+    # Items still to pick up, with their place in the walk: the corridor's position in
+    # the market, or the category name when shopping without a market (the list is then
+    # grouped by category, in alphabetical order).
+    if active.market_id is None:
+        by_category = db.execute(
+            select(ShoppingListItem, Category.name)
+            .join(Product, Product.id == ShoppingListItem.product_id)
+            .join(Category, Category.id == Product.category_id)
+            .where(
+                ShoppingListItem.shopping_list_id == active.id,
+                ShoppingListItem.status != ShoppingListItemStatus.CHECKED,
+            )
+        ).all()
+        groups_by_name: dict[str, list[ShoppingListItem]] = {}
+        for item, name in by_category:
+            groups_by_name.setdefault(name, []).append(item)
+        names = sorted(groups_by_name)
+        assignment = split_corridors([len(groups_by_name[n]) for n in names], len(user_ids))
+        for name, person in zip(names, assignment, strict=True):
+            for item in groups_by_name[name]:
+                item.assigned_user_id = user_ids[person]
+        return active
+
     rows = db.execute(
         select(ShoppingListItem, Corridor.position)
         .join(Product, Product.id == ShoppingListItem.product_id)

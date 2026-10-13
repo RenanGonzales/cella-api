@@ -21,6 +21,14 @@ class ShoppingListItemStatus(StrEnum):
     NOT_FOUND = "not_found"
 
 
+class ReceiptSource(StrEnum):
+    """Where the prices of a purchase came from."""
+
+    SAMPLE = "sample"  # the demo's generated receipt
+    AI = "ai"  # a photo read by Claude
+    MANUAL = "manual"  # typed in by hand
+
+
 class CorridorKind(StrEnum):
     """What a piece of the market's floor plan is."""
 

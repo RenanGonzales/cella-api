@@ -11,6 +11,7 @@ from app.api.routes import (
     products,
     purchases,
     shopping_list,
+    stats,
     storage_areas,
 )
 from app.core.config import get_settings
@@ -38,6 +39,7 @@ app.include_router(markets.router)
 app.include_router(consumption.router)
 app.include_router(shopping_list.router)
 app.include_router(purchases.router)
+app.include_router(stats.router)
 
 
 @app.get("/health", tags=["health"])

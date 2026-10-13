@@ -7,7 +7,9 @@ from app.api.deps import CurrentUser, DbSession
 from app.domain.stock import needs_restock
 from app.models import Category, Product, StorageArea
 from app.schemas.catalog import ProductCreate, ProductOut, ProductUpdate
+from app.schemas.stats import PricePoint
 from app.services.catalog import get_owned, products_with_last_price
+from app.services.stats import price_history
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -98,6 +100,15 @@ def list_products(
 @router.get("/{product_id}", response_model=ProductOut)
 def read_product(product_id: uuid.UUID, user: CurrentUser, db: DbSession) -> ProductOut:
     return read_product_out(db, user, product_id)
+
+
+@router.get("/{product_id}/prices", response_model=list[PricePoint])
+def read_prices(
+    product_id: uuid.UUID, user: CurrentUser, db: DbSession, limit: int = Query(12, ge=1, le=52)
+) -> list[PricePoint]:
+    """Prices paid for the product in its last purchases, oldest first."""
+    product = get_owned(db, Product, product_id, user.household_id, LABEL)
+    return price_history(db, product, limit)
 
 
 @router.post("", response_model=ProductOut, status_code=status.HTTP_201_CREATED)

@@ -290,6 +290,9 @@ def build_list_view(
                 added_manually=item.added_manually,
                 assigned_user_id=item.assigned_user_id,
                 last_price_cents=last_price,
+                current_quantity=product.current_quantity,
+                min_quantity=product.min_quantity,
+                ideal_quantity=product.ideal_quantity,
             )
         )
         item_count += 1

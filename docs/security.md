@@ -25,6 +25,9 @@ Format: **threat -> protection -> trade-off**.
 | Demo visitors seeing each other's data | Each visitor gets a private copy of the demo household; the usual household scoping (`404` across households) keeps copies apart | `app/services/demo.py` |
 | Demo copies filling the database | Copies expire after 24 hours and are deleted on the next demo (or by `scripts/cleanup_demo.py`); at most `DEMO_MAX_SANDBOXES` live copies, then `503` | `app/services/demo.py` |
 | Real accounts inside a temporary demo | Invite codes of demo copies are rejected at sign-up | `app/api/routes/auth.py` |
+| Someone spending the API key of the receipt reader | Off by default; only emails in `RECEIPT_AI_EMAILS`, never demo households (`403`); images over 5 MB refused; monthly spend limit on the Anthropic Console | `app/services/receipts.py` |
+| Personal data on receipts | Photos are never stored, only the confirmed prices; the model is told not to copy tax ids, names or addresses | `app/services/receipts.py` |
+| Instructions hidden in a receipt photo | The model answers only through a fixed tool schema; matches are limited to the products of that trip and anything else is dropped; nothing is saved without review | `app/services/receipts.py` |
 | Cross-origin requests | CORS only allows the local dev frontend; in production the frontend and the API share one origin | `app/main.py` |
 
 ## Known trade-offs (demo mode)

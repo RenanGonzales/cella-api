@@ -16,7 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, Quantity, UUIDPrimaryKey, enum_check, str_enum
-from app.models.enums import ShoppingListItemStatus, ShoppingListStatus
+from app.models.enums import ReceiptSource, ShoppingListItemStatus, ShoppingListStatus
 
 
 class ShoppingList(UUIDPrimaryKey, Base):
@@ -30,6 +30,8 @@ class ShoppingList(UUIDPrimaryKey, Base):
             postgresql_where=text("status IN ('open', 'shopping')"),
         ),
         enum_check("status", ShoppingListStatus),
+        enum_check("receipt_source", ReceiptSource),
+        CheckConstraint("receipt_total_cents >= 0", name="receipt_total_positive"),
     )
 
     household_id: Mapped[uuid.UUID] = mapped_column(
@@ -44,6 +46,9 @@ class ShoppingList(UUIDPrimaryKey, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    # Set when the receipt of an archived list is confirmed.
+    receipt_source: Mapped[ReceiptSource | None] = mapped_column(str_enum(ReceiptSource))
+    receipt_total_cents: Mapped[int | None] = mapped_column(Integer)
 
     items: Mapped[list["ShoppingListItem"]] = relationship(
         back_populates="shopping_list", cascade="all, delete-orphan"
